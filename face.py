@@ -4,10 +4,9 @@ from sklearn.model_selection import train_test_split
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.svm import SVC
 from sklearn.metrics import accuracy_score, confusion_matrix
-import tensorflow as tf
 from PIL import Image
 import cv2
-
+from keras_facenet import FaceNet 
 def load_images_from_folder(folder):
     images = []
     labels = []
@@ -30,42 +29,65 @@ def load_images_from_folder(folder):
     
     return np.array(images), np.array(labels), label_map
 
+print("Loading FaceNet model...")
+facenet = FaceNet()
 
-# facenet_model = models.load_model("facenet_keras.h5")
-facenet_model = tf.keras.models.load_model("facenet_keras.h5")
+def get_embedding(facenet_model, face_pixels):
+    """
+    Get the embedding from the FaceNet model
+    The keras-facenet package expects RGB images but OpenCV loads as BGR
+    """
+    face_pixels_rgb = cv2.cvtColor(face_pixels, cv2.COLOR_BGR2RGB)
+    embedding = facenet_model.embeddings([face_pixels_rgb])[0]
+    return embedding
 
-
-def get_embedding(model, face_pixels):
-    face_pixels = face_pixels.astype('float32')
-    mean, std = face_pixels.mean(), face_pixels.std()
-    face_pixels = (face_pixels - mean) / std
-    face_pixels = np.expand_dims(face_pixels, axis=0)
-    return model.predict(face_pixels)[0]
-
+print("Loading images...")
 images, labels, label_map = load_images_from_folder("dataset_faces")
-embeddings = np.array([get_embedding(facenet_model, img) for img in images])
+print(f"Loaded {len(images)} images from {len(label_map)} different people")
 
+print("Generating face embeddings...")
+embeddings = []
+for i, img in enumerate(images):
+    if i % 10 == 0:
+        print(f"Processing image {i+1}/{len(images)}")
+    embedding = get_embedding(facenet, img)
+    embeddings.append(embedding)
+embeddings = np.array(embeddings)
+print(f"Generated {len(embeddings)} embeddings with dimension {embeddings.shape[1]}")
 
+print("Splitting dataset for training and testing...")
 X_train, X_test, y_train, y_test = train_test_split(embeddings, labels, test_size=5*3, stratify=labels, random_state=42)
+print(f"Training set: {X_train.shape[0]} samples, Test set: {X_test.shape[0]} samples")
 
-
-
-# Classificador kNN
+print("Training KNN classifier...")
 knn = KNeighborsClassifier(n_neighbors=3)
 knn.fit(X_train, y_train)
 y_pred_knn = knn.predict(X_test)
 acc_knn = accuracy_score(y_test, y_pred_knn)
 cm_knn = confusion_matrix(y_test, y_pred_knn)
 print("Accuracy KNN:", acc_knn)
-print("Matriz de Confusão KNN:\n", cm_knn)
+print("Confusion Matrix KNN:\n", cm_knn)
 
-# Classificador SVM
+print("Training SVM classifier...")
 svm = SVC(kernel='linear', probability=True)
 svm.fit(X_train, y_train)
 y_pred_svm = svm.predict(X_test)
 acc_svm = accuracy_score(y_test, y_pred_svm)
 cm_svm = confusion_matrix(y_test, y_pred_svm)
 print("Accuracy SVM:", acc_svm)
-print("Matriz de Confusão SVM:\n", cm_svm)
+print("Confusion Matrix SVM:\n", cm_svm)
 
-#TODO: maybe compare the models?
+
+# pra deixar bonitinho
+print("\n===== Model Comparison =====")
+if acc_knn > acc_svm:
+    print(f"KNN performs better with {acc_knn:.4f} accuracy (SVM: {acc_svm:.4f})")
+    best_model = "KNN"
+elif acc_svm > acc_knn:
+    print(f"SVM performs better with {acc_svm:.4f} accuracy (KNN: {acc_knn:.4f})")
+    best_model = "SVM"
+else:
+    print(f"Both models perform equally with {acc_knn:.4f} accuracy")
+    best_model = "Either KNN or SVM"
+
+print(f"Recommendation: Use {best_model} for this face recognition task")
