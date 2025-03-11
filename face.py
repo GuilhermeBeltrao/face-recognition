@@ -35,7 +35,7 @@ def get_embedding(facenet_model, face_pixels):
     embedding = facenet_model.embeddings([face_pixels_rgb])[0]
     return embedding
 
-def plot_confusion_matrix(cm, title):
+def plot_confusion_matrix(cm, title, label_map):
     plt.figure(figsize=(6, 5))
     sns.heatmap(cm, annot=True, fmt='d', cmap="Blues", xticklabels=label_map.values(), yticklabels=label_map.values())
     plt.xlabel('Predicted Label')
@@ -54,30 +54,51 @@ print("Generating face embeddings...")
 embeddings = np.array([get_embedding(facenet, img) for img in images])
 
 print("Splitting dataset for training and testing...")
-X_train, X_test, y_train, y_test = train_test_split(embeddings, labels, test_size=5*3, stratify=labels)
+
+X_train, X_test, y_train, y_test = train_test_split(embeddings, labels, test_size=15, stratify=labels)
 
 print("Training KNN classifier...")
 knn = KNeighborsClassifier(n_neighbors=3)
 knn.fit(X_train, y_train)
 y_pred_knn = knn.predict(X_test)
-acc_knn = accuracy_score(y_test, y_pred_knn)
-cm_knn = confusion_matrix(y_test, y_pred_knn)
 
 print("Training SVM classifier...")
 svm = SVC(kernel='linear', probability=True)
 svm.fit(X_train, y_train)
 y_pred_svm = svm.predict(X_test)
+
+acc_knn = accuracy_score(y_test, y_pred_knn)
 acc_svm = accuracy_score(y_test, y_pred_svm)
-cm_svm = confusion_matrix(y_test, y_pred_svm)
+
+print("\n===== Individual Model Performance =====")
+print(f"KNN Accuracy: {acc_knn:.4f}")
+print(f"SVM Accuracy: {acc_svm:.4f}")
+
+better_model = "KNN" if acc_knn > acc_svm else "SVM"
+print(f"The better performing model is: {better_model}")
+
+agreement_count = 0
+disagreement_count = 0
 
 print("\n===== Model Comparison =====")
-if acc_knn > acc_svm:
-    print(f"KNN performs better with {acc_knn:.4f} accuracy (SVM: {acc_svm:.4f})")
-elif acc_svm > acc_knn:
-    print(f"SVM performs better with {acc_svm:.4f} accuracy (KNN: {acc_knn:.4f})")
-else:
-    print(f"Both models perform equally with {acc_knn:.4f} accuracy")
-    best_model = "Either KNN or SVM"
-# Plot confusion matrices
-plot_confusion_matrix(cm_knn, "Confusion Matrix - KNN")
-plot_confusion_matrix(cm_svm, "Confusion Matrix - SVM")
+print(f"KNN Accuracy: {acc_knn:.4f}")
+print(f"SVM Accuracy: {acc_svm:.4f}")
+
+cm_knn = confusion_matrix(y_test, y_pred_knn)
+cm_svm = confusion_matrix(y_test, y_pred_svm)
+
+plot_confusion_matrix(cm_knn, "Confusion Matrix - KNN", label_map)
+plot_confusion_matrix(cm_svm, "Confusion Matrix - SVM", label_map)
+
+
+print("\n===== Misclassification Analysis =====")
+for i in range(len(y_test)):
+    if y_pred_knn[i] != y_test[i] or y_pred_svm[i] != y_test[i]:
+        true_person = label_map[y_test[i]]
+        knn_pred = label_map[y_pred_knn[i]]
+        svm_pred = label_map[y_pred_svm[i]]
+        
+        print(f"Image {i}: True person: {true_person}")
+        print(f"  - KNN predicted: {knn_pred}")
+        print(f"  - SVM predicted: {svm_pred}")
+        print("---")
