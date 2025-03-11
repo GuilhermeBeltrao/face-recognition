@@ -55,7 +55,7 @@ embeddings = np.array([get_embedding(facenet, img) for img in images])
 
 print("Splitting dataset for training and testing...")
 
-X_train, X_test, y_train, y_test = train_test_split(embeddings, labels, test_size=15, stratify=labels)
+X_train, X_test, y_train, y_test = train_test_split(embeddings, labels, test_size=15, stratify=labels, random_state=2)
 
 print("Training KNN classifier...")
 knn = KNeighborsClassifier(n_neighbors=3)
@@ -76,9 +76,6 @@ print(f"SVM Accuracy: {acc_svm:.4f}")
 
 better_model = "KNN" if acc_knn > acc_svm else "SVM"
 print(f"The better performing model is: {better_model}")
-
-agreement_count = 0
-disagreement_count = 0
 
 print("\n===== Model Comparison =====")
 print(f"KNN Accuracy: {acc_knn:.4f}")
